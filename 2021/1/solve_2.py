@@ -54,12 +54,15 @@ def slicing_window(iterable, size: int):
 
 def solve(input_path: str) -> int:
     with open(input_path, 'r') as input_file:
-        count = sum(input_file | select(lambda depth: int(depth[:-1]))
+        count = sum(
+                input_file
+                | select(lambda depth: int(depth[:-1]))
                 | slicing_window(3)
                 | select(lambda triplet: sum(triplet))
                 | slicing_window(2)
                 | where(lambda doublet: doublet[0] < doublet[1])
-                | select(lambda x: 1))
+                | select(lambda x: 1)
+        )
 
     return count
 
