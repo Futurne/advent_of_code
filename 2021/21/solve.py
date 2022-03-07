@@ -107,20 +107,28 @@ def play_one_turn(
         P: np.ndarray,
         M: np.ndarray,
     ) -> tuple:
+    # print(S.sum(axis=(2, 3)))  # Should be one row at the first turn
     S = S.reshape(*S.shape, 1)  # Unsqueeze last dim for broadcast
     S = S * P  # [n_scores, n_pos, n_pos]  =>  S[i, j, k] = "how many universes move from pos j to pos k with initial score i"
     S = S.sum(axis=-2)  # [n_scores, n_pos]  => S[i, j] = "how many universes with initial score i are now in pos j"
+    # print(S.sum(axis=(0, 1)))
+    # print(S.sum(axis=(2, 3)))  # Should be one row at the first turn
+    # print('')
     for col_idx, shift in enumerate(range(1, 11)):
-        S[:, col_idx] = np.roll(S[:, col_idx], shift)  # Move universes to dedicated score
+        S[:, :, :, col_idx] = np.roll(S[:, :, :, col_idx], shift, axis=[2])  # Move universes to dedicated score
 
+    # print(S.sum(axis=(0, 1)))
+    # print('')
+    # print(S.sum(axis=(2, 3)))  # Should be one row at the first turn
+    # return
     n_wins = np.sum(S * M)  # Count ended games
     S = (1 - M) * S  # Remove ended games
     return S, n_wins
 
+
 def quantum_dice(pos: tuple) -> int:
-    scores = np.zeros((2, 21, 10), dtype=int)
-    scores[0, 0, pos[0] - 1] = 1
-    scores[1, 0, pos[1] - 1] = 1
+    scores = np.zeros((21, 10, 21, 10), dtype=int)
+    scores[0, pos[1] - 1, 0, pos[0] - 1] = 1
 
     winners_mask = np.ones((21, 10), dtype=int)
     winners_mask = np.triu(winners_mask)
@@ -134,24 +142,11 @@ def quantum_dice(pos: tuple) -> int:
 
     player_turn = 0
     while (scores != 0).any():
-        S = scores[player_turn]  # [n_scores, n_pos]  =>  S[i, j] = "how many universes are in pos j with score i"
-
-        # Update S by playing a turn for the player
-        S = S.reshape(21, 10, 1)  # Unsqueeze for broadcast
-        S = S * P  # [n_scores, n_pos, n_pos]  =>  S[i, j, k] = "how many universes move from pos j to pos k with initial score i"
-        S = S.sum(axis=1)  # [n_scores, n_pos]  => S[i, j] = "how many universes with initial score i are now in pos j"
-        for col_idx, shift in enumerate(range(1, 11)):
-            S[:, col_idx] = np.roll(S[:, col_idx], shift)  # Move universes to dedicated score
-
-        total_winners[player_turn] += np.sum(S * winners_mask)  # Count ended games
-        S = (1 - winners_mask) * S  # Remove ended games
-        scores[player_turn] = S
-        scores[1 - player_turn] *= 27  # Create 27 alternate universes with the same game state for each previous universe
-
-        # TODO: remove ended games from other player
-        # Use a matrix in [21 x 10 x 21 x 10] ?
+        scores, n_wins = play_one_turn(scores, P, winners_mask)
+        total_winners[player_turn] += n_wins
 
         player_turn = 1 - player_turn
+        scores = scores.transpose(2, 3, 0, 1)
 
     return max(total_winners)
 
@@ -168,6 +163,6 @@ def main(path_input: str) -> int:
 if __name__ == '__main__':
     print('Solution for day 21')
 
-    sol1, sol2 = main('example')
+    sol1, sol2 = main('input')
     print('Part 1:', sol1)
     print('Part 2:', sol2)
